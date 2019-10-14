@@ -1,8 +1,8 @@
-# Action Atlas
+# Atlas
 
 ## Install
 You can use the these editor scripts in your own project by adding this project as a [Defold library dependency](https://www.defold.com/manuals/libraries/). Open your game.project file and in the dependencies field under project add:  
-https://github.com/Jerakin/editor-script--atlas/archive/master.zip
+https://github.com/Jerakin/editor-script-atlas/archive/master.zip
 
 ### Dependencies
 You also need to make sure you have python 3 and [deftree](https://github.com/Jerakin/DefTree) installed.  
