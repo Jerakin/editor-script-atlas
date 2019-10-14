@@ -45,7 +45,7 @@ function M.get_commands()
                 return {
                     {
                         action = "shell", 
-                        command = {"python", "./editor/scripts/add_to_atlas.py", unpack(paths)}
+                        command = {"python", "./editor-script-atlas/scripts/add_to_atlas.py", unpack(paths)}
                     }
                 }
             end
