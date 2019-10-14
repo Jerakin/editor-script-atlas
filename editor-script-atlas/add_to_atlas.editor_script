@@ -1,0 +1,56 @@
+--local utils = require "editor.utils"
+
+local M = {}
+
+local function unpack(t, i)
+    i = i or 1
+    if t[i] ~= nil then
+        return t[i], unpack(t, i + 1)
+    end
+end
+
+local function ends_with(str, ending)
+    return ending == "" or str:sub(-#ending) == ending
+end
+
+function M.get_commands()
+    return {
+        {
+            label="Add To Atlas...",
+            locations = {"Assets"},
+            query = {
+                selection = {type = "resource", cardinality = "many"}
+            },
+            active = function(opts)
+                local atlas = false
+                for _, id in pairs(opts.selection) do
+                    local path = editor.get(id, "path")
+                    if ends_with(path, ".atlas") then
+                        if atlas == true then
+                            return false
+                        end
+                        atlas = true
+                    elseif ends_with(path, ".png") then
+                    else
+                        return false
+                    end
+                end
+                return atlas and #opts.selection > 1
+            end,
+            run = function(opts)
+                local paths = {}
+                for _, id in pairs(opts.selection) do
+                    table.insert(paths, editor.get(id, "path"))
+                end
+                return {
+                    {
+                        action = "shell", 
+                        command = {"python", "./editor/scripts/add_to_atlas.py", unpack(paths)}
+                    }
+                }
+            end
+        }
+    }
+end
+
+return M

@@ -1,0 +1,6 @@
+[project]
+title = editor-script-atlas
+
+[library]
+include_dirs = editor-script-atlas
+
