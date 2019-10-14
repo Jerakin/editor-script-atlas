@@ -13,6 +13,16 @@ local function ends_with(str, ending)
     return ending == "" or str:sub(-#ending) == ending
 end
 
+-- Need to source the bash_profile ourselves to add the users 
+-- environment variables such as his extended PATH
+local function command_workaround()
+    if editor.platform == "x86_64-darwin" then
+        return "./editor-script-atlas/scripts/extend_path.sh"
+    end
+    return "python"
+end
+
+
 function M.get_commands()
     return {
         {
@@ -40,12 +50,12 @@ function M.get_commands()
             run = function(opts)
                 local paths = {}
                 for _, id in pairs(opts.selection) do
-                    table.insert(paths, editor.get(id, "path"))
+                    table.insert(paths, '"' .. editor.get(id, "path") .. '"')
                 end
                 return {
                     {
                         action = "shell", 
-                        command = {"python", "./editor-script-atlas/scripts/add_to_atlas.py", unpack(paths)}
+                        command = {command_workaround(), "./editor-script-atlas/scripts/add_to_atlas.py", unpack(paths)}
                     }
                 }
             end

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Editor script to create a component for the provided resource
 """
@@ -42,6 +43,5 @@ def main(paths):
 
 
 if __name__ == '__main__':
-    print("Arguments", sys.argv)
     main(sys.argv[1:])
 
