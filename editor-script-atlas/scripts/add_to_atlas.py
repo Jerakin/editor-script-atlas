@@ -2,15 +2,28 @@
 """
 Editor script to create a component for the provided resource
 """
+from os.path import exists
+
+_log_file = "python_log.txt"
+
+if exists(_log_file):
+    import sys
+    import traceback
+
+    def log_exception(a, b, tb):
+        with open("python_log.txt", "a") as fp:
+            traceback.print_tb(tb, file=fp)
+
+    sys.stdout = open("python_log.txt", 'w')
+    sys.excepthook = log_exception
+
 from pathlib import Path
 import deftree
 import sys
 
-# If we need to do some debug printing
-sys.stdout = open(Path("python_log.txt"), 'w')
 
-_anchor = Path("/").anchor
 def _fix_path(path):
+    _anchor = Path("/").anchor
     """We have to remove the anchor if there is one"""
     if path.anchor == _anchor:
         path = Path(str(path)[1:])
@@ -28,6 +41,7 @@ def atlas(atlas_path, paths):
 
     tree.write()
 
+
 def main(paths):
     """Find the atlas among the input arguments"""
     atlas_path = None
@@ -44,4 +58,3 @@ def main(paths):
 
 if __name__ == '__main__':
     main(sys.argv[1:])
-
