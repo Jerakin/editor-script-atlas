@@ -1,19 +1,4 @@
 #!/usr/bin/env python3
-from os.path import exists
-
-_log_file = "python_log.txt"
-
-if exists(_log_file):
-    import sys
-    import traceback
-
-    def log_exception(a, b, tb):
-        with open("python_log.txt", "a") as fp:
-            traceback.print_tb(tb, file=fp)
-
-    sys.stdout = open("python_log.txt", 'w')
-    sys.excepthook = log_exception
-
 import sys
 from pathlib import Path
 import deftree
@@ -57,9 +42,12 @@ def sort_atlas(path):
 
     new_tree.write()
 
+
 def main(path):
+    print("Sorting the Atlas", path)
     path = _fix_path(Path(path))
     sort_atlas(path)
+
 
 if __name__ == '__main__':
     main(sys.argv[-1])

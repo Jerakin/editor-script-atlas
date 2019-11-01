@@ -55,7 +55,7 @@ function M.get_commands()
                 return {
                     {
                         action = "shell", 
-                        command = {command_workaround(), "./editor-script-atlas/scripts/add_to_atlas.py", unpack(paths)}
+                        command = {command_workaround(), "-u", "-c", editor.get("/editor-script-atlas/scripts/add_to_atlas.py", "text"), unpack(paths)}
                     }
                 }
             end
@@ -75,7 +75,7 @@ function M.get_commands()
                 return {
                     {
                         action = "shell",
-                        command = {command_workaround(), "./editor-script-atlas/scripts/sort_atlas.py", path} 
+                        command = {command_workaround(), "-u", "-c", editor.get("/editor-script-atlas/scripts/sort_atlas.py", "text"), path} 
                     }
                 }
             end
