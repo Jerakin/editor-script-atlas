@@ -1,6 +1,15 @@
---local utils = require "editor.utils"
-
 local M = {}
+
+local function image_template(image)
+    return [[images {
+  image: "]] .. image .. [["
+}
+]]
+end
+
+local function path_segments(path)
+    return string.match(path, "(.-)([^\\/]-%.?([^%.\\/]*))$")
+end
 
 local function unpack(t, i)
     i = i or 1
@@ -13,72 +22,95 @@ local function ends_with(str, ending)
     return ending == "" or str:sub(-#ending) == ending
 end
 
--- Need to source the bash_profile ourselves to add the users 
--- environment variables such as his extended PATH
-local function command_workaround()
-    if editor.platform == "x86_64-darwin" then
-        return "./editor-script-atlas/scripts/extend_path.sh"
+local function is_add_active(opts)
+    local atlas = false
+    for _, id in pairs(opts.selection) do
+        local path = editor.get(id, "path")
+        if ends_with(path, ".atlas") then
+            if atlas == true then
+                return false
+            end
+            atlas = true
+        elseif ends_with(path, ".png") then
+        else
+            return false
+        end
     end
-    return "python"
+    return atlas and #opts.selection > 1
 end
 
+local function is_new_active(opts)
+    local atlas = false
+    for _, id in pairs(opts.selection) do
+        local path = editor.get(id, "path")
+        if ends_with(path, ".png") then
+        else
+            return false
+        end
+    end
+    return true
+end
+
+local function add_to_atlas(opts)
+    local atlas
+    local new_images_string = ""
+    for _, id in pairs(opts.selection) do
+        local path = editor.get(id, "path")
+        if ends_with(path, ".png") then
+            new_images_string = new_images_string .. image_template(path)
+        else
+            atlas = path
+        end
+    end
+
+    -- Get the text
+    local atlas_file = io.open("." .. atlas, "r")
+    local atlas_text = atlas_file:read("*a")
+    atlas_file:close()
+    
+    atlas_file = io.open("." .. atlas, "w")
+    atlas_file:write(new_images_string .. atlas_text)
+    atlas_file:close()
+end
+
+
+local function new_atlas(opts)
+    local base_path = path_segments(editor.get(opts.selection[1], "path"))
+    local atlas = base_path .. "ATLAS" .. os.date("%Y%m%d%H%M%S") .. ".atlas"
+    local atlas_string = ""
+    for _, id in pairs(opts.selection) do
+        local path = editor.get(id, "path")
+        atlas_string = atlas_string .. image_template(path)
+    end
+    atlas_string = atlas_string .. [[margin: 0
+extrude_borders: 2
+inner_padding: 0]]
+
+    local atlas_file = io.open("." .. atlas, "w")
+    atlas_file:write(atlas_string)
+    atlas_file:close()
+
+end
 
 function M.get_commands()
     return {
         {
-            label="Add To Atlas...",
+            label="Add to Atlas...",
             locations = {"Assets"},
             query = {
                 selection = {type = "resource", cardinality = "many"}
             },
-            active = function(opts)
-                local atlas = false
-                for _, id in pairs(opts.selection) do
-                    local path = editor.get(id, "path")
-                    if ends_with(path, ".atlas") then
-                        if atlas == true then
-                            return false
-                        end
-                        atlas = true
-                    elseif ends_with(path, ".png") then
-                    else
-                        return false
-                    end
-                end
-                return atlas and #opts.selection > 1
-            end,
-            run = function(opts)
-                local paths = {}
-                for _, id in pairs(opts.selection) do
-                    table.insert(paths, '"' .. editor.get(id, "path") .. '"')
-                end
-                return {
-                    {
-                        action = "shell", 
-                        command = {command_workaround(), "-u", "-c", editor.get("/editor-script-atlas/scripts/add_to_atlas.py", "text"), unpack(paths)}
-                    }
-                }
-            end
+            active = is_add_active,
+            run = add_to_atlas
         },
         {
-            label="Sort Atlas",
+            label="Create New Atlas...",
             locations = {"Assets"},
             query = {
-                selection = {type = "resource", cardinality = "one"}
+                selection = {type = "resource", cardinality = "many"}
             },
-            active = function(opts)
-                local path = editor.get(opts.selection, "path")
-                return ends_with(path, ".atlas")
-            end,
-            run = function(opts)
-                local path = editor.get(opts.selection, "path")
-                return {
-                    {
-                        action = "shell",
-                        command = {command_workaround(), "-u", "-c", editor.get("/editor-script-atlas/scripts/sort_atlas.py", "text"), path} 
-                    }
-                }
-            end
+            active = is_new_active,
+            run = new_atlas
         }
     }
 end
