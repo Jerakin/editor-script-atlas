@@ -1,28 +1,68 @@
 local M = {}
 
-local function image_template(image)
-    return [[images {
-  image: "]] .. image .. [["
-}
-]]
+
+local function image_template(image, spacing)
+    local space = string.rep(" ", spacing or 2)
+    return "images {\n" .. space .. "image: \"" .. image .. "\"\n}"
 end
+
 
 local function path_segments(path)
     return string.match(path, "(.-)([^\\/]-%.?([^%.\\/]*))$")
 end
 
-local function unpack(t, i)
-    i = i or 1
-    if t[i] ~= nil then
-        return t[i], unpack(t, i + 1)
-    end
-end
 
 local function ends_with(str, ending)
     return ending == "" or str:sub(-#ending) == ending
 end
 
-local function is_add_active(opts)
+
+local function get_atlas(opts)
+    -- Get the first selected atlas, because of our `is_active*` doesn't allow multiple
+    -- the first one is also the only one.
+    for _, id in pairs(opts.selection) do
+        local path = editor.get(id, "path")
+        if ends_with(path, ".atlas") then
+            return path
+        end
+    end
+end
+
+
+local function update_atlas(atlas, new_images_string)
+    -- Get the old atlas text then add our new string to the beginning.
+    -- While the editor would add them to the end, it's a lot easier for
+    -- us to add at the start as then we don't have to care about the 
+    -- atlas properties.
+    
+    local atlas_file = io.open("." .. atlas, "r")
+    local atlas_text = atlas_file:read("*a")
+    atlas_file:close()
+
+    atlas_file = io.open("." .. atlas, "w")
+    atlas_file:write(new_images_string .. atlas_text)
+    atlas_file:close()
+end
+
+
+local function image_strings(opts, spacing)
+    -- Generate new the images strings from all selected .png files.
+    local new_images_string = ""
+    for _, id in pairs(opts.selection) do
+        local path = editor.get(id, "path")
+        if ends_with(path, ".png") then
+            new_images_string = new_images_string .. image_template(path, spacing)
+        end
+    end
+    return new_images_string
+end
+
+
+local function images_and_atlas_are_selected(opts)
+    -- Return true if both images and an atlas are selected, however it only allows for 1 atlas.
+    -- if there is multiple we would have to add it to all selected atlases and that sounds,
+    -- like it would be easy to mess up for the user.
+    
     local atlas = false
     local png = false
     for _, id in pairs(opts.selection) do
@@ -39,7 +79,9 @@ local function is_add_active(opts)
     return atlas and png
 end
 
-local function is_new_active(opts)
+
+local function images_but_no_atlas_are_selected(opts)
+    -- Return true if images are selected, but no altas.
     local atlas = false
     local png = false
     for _, id in pairs(opts.selection) do
@@ -53,30 +95,28 @@ local function is_new_active(opts)
     return png and not atlas
 end
 
-local function add_to_atlas(opts)
-    local atlas
-    local new_images_string = ""
-    for _, id in pairs(opts.selection) do
-        local path = editor.get(id, "path")
-        if ends_with(path, ".png") then
-            new_images_string = new_images_string .. image_template(path)
-        elseif ends_with(path, ".atlas") then
-            atlas = path
-        end
-    end
 
-    -- Get the text
-    local atlas_file = io.open("." .. atlas, "r")
-    local atlas_text = atlas_file:read("*a")
-    atlas_file:close()
+local function add_images_as_animation(opts)
+    local animation_start_string = "animations {\  id: \"" .. "anim_" .. os.date("%Y%m%d%H%M%S") .. "\"\n"
+    local animation_end_string = "  playback: PLAYBACK_LOOP_FORWARD\n  fps: 60\n  flip_horizontal: 0  \nflip_vertical: 0\n}\n"
+    local images = image_strings(opts, 4)
 
-    atlas_file = io.open("." .. atlas, "w")
-    atlas_file:write(new_images_string .. atlas_text)
-    atlas_file:close()
+    local atlas = get_atlas(opts)
+    local new_images_string = animation_start_string .. images .. animation_end_string
+    update_atlas(atlas, new_images_string)
 end
 
 
-local function new_atlas(opts)
+local function add_images_as_images(opts)
+    local atlas = get_atlas(opts)
+    local new_images_string = image_strings(opts)
+
+    update_atlas(atlas, new_images_string)
+end
+
+
+
+local function add_images_to_new_atlas(opts)
     local base_path = path_segments(editor.get(opts.selection[1], "path"))
     local atlas = base_path .. "ATLAS" .. os.date("%Y%m%d%H%M%S") .. ".atlas"
     local atlas_string = ""
@@ -94,16 +134,26 @@ inner_padding: 0]]
 
 end
 
+
 function M.get_commands()
     return {
         {
-            label="Add to Atlas...",
+            label="Add images...",
             locations = {"Assets"},
             query = {
                 selection = {type = "resource", cardinality = "many"}
             },
-            active = is_add_active,
-            run = add_to_atlas
+            active = images_and_atlas_are_selected,
+            run = add_images_as_images
+        },
+        {
+            label="Add images as animation...",
+            locations = {"Assets"},
+            query = {
+                selection = {type = "resource", cardinality = "many"}
+            },
+            active = images_and_atlas_are_selected,
+            run = add_images_as_animation
         },
         {
             label="Create New Atlas...",
@@ -111,8 +161,8 @@ function M.get_commands()
             query = {
                 selection = {type = "resource", cardinality = "many"}
             },
-            active = is_new_active,
-            run = new_atlas
+            active = images_but_no_atlas_are_selected,
+            run = add_images_to_new_atlas
         }
     }
 end
