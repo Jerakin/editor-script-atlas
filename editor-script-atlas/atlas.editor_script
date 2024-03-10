@@ -156,7 +156,7 @@ function M.get_commands()
             run = add_images_as_animation
         },
         {
-            label="Create New Atlas...",
+            label="Create New Atlas",
             locations = {"Assets"},
             query = {
                 selection = {type = "resource", cardinality = "many"}
