@@ -51,7 +51,7 @@ local dialog = editor.ui.component(function(props)
             editor.ui.dialog_button({
                 text = "Add",
                 enabled = name ~= "",
-                defualt = true,
+                default = true,
                 result = name
             }),
         }
