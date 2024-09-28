@@ -29,6 +29,36 @@ local function get_atlas(opts)
 end
 
 
+local dialog = editor.ui.component(function(props)
+    local name, set_name = editor.ui.use_state("")
+
+    return editor.ui.dialog({
+        title= props.title,
+        content = editor.ui.vertical({
+            padding = editor.ui.PADDING_LARGE,
+            children = {
+                editor.ui.string_field({
+                    value = name,
+                    on_value_changed = set_name
+                })
+            }
+        }),
+        buttons = {
+            editor.ui.dialog_button({
+                text = "Cancel",
+                cancel = true
+            }),
+            editor.ui.dialog_button({
+                text = "Add",
+                enabled = name ~= "",
+                defualt = true,
+                result = name
+            }),
+        }
+    })
+end)
+
+
 local function update_atlas(atlas, new_images_string)
     -- Get the old atlas text then add our new string to the beginning.
     -- While the editor would add them to the end, it's a lot easier for
@@ -97,7 +127,12 @@ end
 
 
 local function add_images_as_animation(opts)
-    local animation_start_string = "animations {\  id: \"" .. "anim_" .. os.date("%Y%m%d%H%M%S") .. "\"\n"
+    local animation_name = editor.ui.show_dialog(dialog({ title = "Add images as animation" }))
+    if animation_name == nil then
+        return
+    end
+    
+    local animation_start_string = "animations {\  id: \"" .. animation_name .. "\"\n"
     local animation_end_string = "  playback: PLAYBACK_LOOP_FORWARD\n  fps: 60\n  flip_horizontal: 0  \nflip_vertical: 0\n}\n"
     local images = image_strings(opts, 4)
 
@@ -117,8 +152,13 @@ end
 
 
 local function add_images_to_new_atlas(opts)
+    local atlas_name = editor.ui.show_dialog(dialog({ title = "Create a new atlas" }))
+    if atlas_name == nil then
+        return
+    end
+
     local base_path = path_segments(editor.get(opts.selection[1], "path"))
-    local atlas = base_path .. "ATLAS" .. os.date("%Y%m%d%H%M%S") .. ".atlas"
+    local atlas = base_path .. atlas_name .. ".atlas"
     local atlas_string = ""
     for _, id in pairs(opts.selection) do
         local path = editor.get(id, "path")
