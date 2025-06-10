@@ -1,16 +1,9 @@
 local M = {}
 
 
-local function image_template(image, spacing)
-    local space = string.rep(" ", spacing or 2)
-    return "images {\n" .. space .. "image: \"" .. image .. "\"\n}"
-end
-
-
 local function path_segments(path)
     return string.match(path, "(.-)([^\\/]-%.?([^%.\\/]*))$")
 end
-
 
 local function ends_with(str, ending)
     return ending == "" or str:sub(-#ending) == ending
@@ -29,11 +22,11 @@ local function get_atlas(opts)
 end
 
 
-local dialog = editor.ui.component(function(props)
+local name_dialog = editor.ui.component(function(props)
     local name, set_name = editor.ui.use_state("")
 
     return editor.ui.dialog({
-        title= props.title,
+        title = props.title,
         content = editor.ui.vertical({
             padding = editor.ui.PADDING_LARGE,
             children = {
@@ -59,33 +52,66 @@ local dialog = editor.ui.component(function(props)
 end)
 
 
-local function update_atlas(atlas, new_images_string)
-    -- Get the old atlas text then add our new string to the beginning.
-    -- While the editor would add them to the end, it's a lot easier for
-    -- us to add at the start as then we don't have to care about the 
-    -- atlas properties.
-    
-    local atlas_file = io.open("." .. atlas, "r")
-    local atlas_text = atlas_file:read("*a")
-    atlas_file:close()
+local yes_no_dialog = editor.ui.component(function(props)
+    return editor.ui.dialog({
+        title = props.title,
+        content = editor.ui.vertical({
+            padding = editor.ui.PADDING_LARGE,
+            children = {
+                editor.ui.label({
+                    text = props.text,
+                    alignment = editor.ui.ALIGNMENT.CENTER
+                })
+            }
+        }),
+        buttons = {
+            editor.ui.dialog_button({
+                text = "Cancel",
+                cancel = true,
+                result = false
+            }),
+            editor.ui.dialog_button({
+                text = "Ok",
+                default = true,
+                result = true
+            }),
+        }
+    })
+end)
 
-    atlas_file = io.open("." .. atlas, "w")
-    atlas_file:write(new_images_string .. atlas_text)
-    atlas_file:close()
-end
 
+local sub_directories_dialog = editor.ui.component(function(props)
+    return editor.ui.dialog({
+        title = props.title,
+        content = editor.ui.vertical({
+            padding = editor.ui.PADDING_LARGE,
+            children = {
+                editor.ui.label({
+                    text = props.text,
+                    alignment = editor.ui.ALIGNMENT.CENTER
+                })
+            }
+        }),
+        buttons = {
+            editor.ui.dialog_button({
+                text = "Top most only",
+                default = true,
+                result = 1
+            }),
+            editor.ui.dialog_button({
+                text = "Folders as animations",
+                default = true,
+                result = 2
+            }),
+            editor.ui.dialog_button({
+                text = "Flat recursive",
+                default = true,
+                result = 3
+            }),
+        }
+    })
+end)
 
-local function image_strings(opts, spacing)
-    -- Generate new the images strings from all selected .png files.
-    local new_images_string = ""
-    for _, id in pairs(opts.selection) do
-        local path = editor.get(id, "path")
-        if ends_with(path, ".png") then
-            new_images_string = new_images_string .. image_template(path, spacing)
-        end
-    end
-    return new_images_string
-end
 
 
 local function images_and_atlas_are_selected(opts)
@@ -126,52 +152,168 @@ local function images_but_no_atlas_are_selected(opts)
 end
 
 
+local function directory_with_images_selected(opts)
+    -- Return true an directory that contains images are selected.
+    local children = editor.get(opts.selection, "children")
+    for i = 1, #children do
+        local resource_path = editor.get(children[i], "path")
+        if ends_with(resource_path, ".png") then
+            return true
+        end
+    end
+end
+
+local function directory_contains_subdirectories(opts)
+    -- Return true an directory that contains images are selected.
+    local children = editor.get(opts.selection, "children")
+    for i = 1, #children do
+        local resource_path = editor.get(children[i], "path")
+        if editor.resource_attributes(resource_path).is_directory then
+            local grand_children = editor.get(opts.selection, "children")
+            for j = 1, #grand_children do
+                resource_path = editor.get(grand_children[j], "path")
+                if editor.resource_attributes(resource_path).is_directory then
+                    return true
+                end
+            end
+        end
+    end
+end
+
 local function add_images_as_animation(opts)
-    local animation_name = editor.ui.show_dialog(dialog({ title = "Add images as animation" }))
+    local animation_name = editor.ui.show_dialog(name_dialog({ title = "Add images as animation" }))
     if animation_name == nil then
         return
     end
-    
-    local animation_start_string = "animations {\  id: \"" .. animation_name .. "\"\n"
-    local animation_end_string = "  playback: PLAYBACK_LOOP_FORWARD\n  fps: 60\n  flip_horizontal: 0  \nflip_vertical: 0\n}\n"
-    local images = image_strings(opts, 4)
-
     local atlas = get_atlas(opts)
-    local new_images_string = animation_start_string .. images .. animation_end_string
-    update_atlas(atlas, new_images_string)
+    for _, id in pairs(opts.selection) do
+        local path = editor.get(id, "path")
+        if not ends_with(path, ".atlas") then
+            editor.tx.add(atlas, "animations", {
+                id=animation_name,
+                image=path
+            })
+        end
+    end
 end
 
 
 local function add_images_as_images(opts)
     local atlas = get_atlas(opts)
-    local new_images_string = image_strings(opts)
-
-    update_atlas(atlas, new_images_string)
+    local txs = {}
+    for _, id in pairs(opts.selection) do
+        local path = editor.get(id, "path")
+        if not ends_with(path, ".atlas") then
+            print(path)
+            table.insert(txs, editor.tx.add(atlas, "images", {image=path}))
+        end
+    end
+    editor.transact(txs)
 end
 
 
+local function add_all_in_directory(atlas, directory, txs, recursive)
+    local children = editor.get(directory, "children")
+    for i = 1, #children do
+        local resource_path = editor.get(children[i], "path")
+        if ends_with(resource_path, ".png") then
+            table.insert(txs, editor.tx.add(atlas, "images", {image=resource_path}))
+        end
+        if recursive and editor.resource_attributes(resource_path).is_directory then
+            add_all_in_directory(atlas, resource_path, txs, recursive)
+        end
+    end
+end
+
+local function folders_as_animations(atlas, directory, txs)
+    local children = editor.get(directory, "children")
+    for i = 1, #children do
+        local resource_path = editor.get(children[i], "path")
+        if ends_with(resource_path, ".png") then
+            table.insert(txs, editor.tx.add(atlas, "images", {image=resource_path}))
+        end
+        if editor.resource_attributes(resource_path).is_directory then
+            local _, name, _ = path_segments(resource_path)
+            local grandchildren = editor.get(resource_path, "children")
+            local images = {}
+            for j = 1, #grandchildren do
+                local grandchild_path = editor.get(grandchildren[j], "path")
+                if ends_with(grandchild_path, ".png") then
+                    table.insert(images, {image=grandchild_path})
+                end
+            end
+            if #images then
+                table.insert(txs, editor.tx.add(atlas, "animations", {id = name, images=images}))
+            end
+        end
+    end
+end
+    
+local function create_atlas_from_folder(opts)
+    local atlas = opts.selection .. ".atlas"
+    
+    local txs = {}
+
+    -- If the atlas already exists we ask if we should continue
+    if editor.resource_attributes(atlas).exists then
+        local atlas_name = editor.ui.show_dialog(yes_no_dialog({ title = "Resource exists", text = "Recreate the atlas?" }))
+        if atlas_name == false then
+            return
+        end
+        table.insert(txs, editor.tx.clear(atlas, "images"))
+        table.insert(txs, editor.tx.clear(atlas, "animations"))
+    else
+        local atlas_file = io.open("." .. atlas, "w")
+        if atlas_file == nil then
+            return
+        end
+        atlas_file:write('')
+        atlas_file:close()
+    end
+
+    
+    if directory_contains_subdirectories(opts) then
+        local creation_mode = editor.ui.show_dialog(sub_directories_dialog({ title = "Subdirectories found.", text = "How do you want to create the atlas?" }))
+        if creation_mode == 1 then
+            add_all_in_directory(atlas, opts.selection, txs, false)
+        elseif creation_mode == 2 then
+            folders_as_animations(atlas, opts.selection, txs)
+        elseif creation_mode == 3 then
+            add_all_in_directory(atlas, opts.selection, txs, true)
+        end
+    else
+        add_all_in_directory(atlas, opts.selection, txs)
+    end
+
+    editor.transact(txs)
+end
+
 
 local function add_images_to_new_atlas(opts)
-    local atlas_name = editor.ui.show_dialog(dialog({ title = "Create a new atlas" }))
+    local atlas_name = editor.ui.show_dialog(name_dialog({ title = "Create a new atlas" }))
     if atlas_name == nil then
         return
     end
 
+
     local base_path = path_segments(editor.get(opts.selection[1], "path"))
     local atlas = base_path .. atlas_name .. ".atlas"
-    local atlas_string = ""
-    for _, id in pairs(opts.selection) do
-        local path = editor.get(id, "path")
-        atlas_string = atlas_string .. image_template(path)
-    end
-    atlas_string = atlas_string .. [[margin: 0
-extrude_borders: 2
-inner_padding: 0]]
 
     local atlas_file = io.open("." .. atlas, "w")
-    atlas_file:write(atlas_string)
+    if atlas_file == nil then
+        return
+    end
+    
+    atlas_file:write('')
     atlas_file:close()
+    
+    local txs = {}
+    for _, id in pairs(opts.selection) do
+        local path = editor.get(id, "path")
+        table.insert(txs, editor.tx.add(atlas, "images", {image=path}))
+    end
 
+    editor.transact(txs)
 end
 
 
@@ -203,6 +345,15 @@ function M.get_commands()
             },
             active = images_but_no_atlas_are_selected,
             run = add_images_to_new_atlas
+        },
+        {
+            label="Create New Atlas",
+            locations = {"Assets"},
+            query = {
+                selection = {type = "resource", cardinality = "one"}
+            },
+            active = directory_with_images_selected,
+            run = create_atlas_from_folder
         }
     }
 end
