@@ -3,7 +3,7 @@
 Makes your life easier when working with images and atlases.
 
 **Features**  
-Adds 3 different actions to your context menu when you have images (and an atlas) selected.
+Adds 4 different actions to your context menu when you have images (and an atlas) selected.
 
 * Add images...
     * Add any number of images to the selected atlas.
@@ -11,6 +11,10 @@ Adds 3 different actions to your context menu when you have images (and an atlas
     * Add any number of images to the selected atlas within an animation group.
 * Create New Atlas
     * Create a new atlas from the selected images
+    * Create a new atlas from a directory
+* Remove duplicated images
+    * Remove any duplicated images in an atlas
+
 
 ## Install
 You can use the these editor scripts in your own project by adding this project as a [Defold library dependency](https://www.defold.com/manuals/libraries/). Open your game.project file and in the dependencies field under project add:  
