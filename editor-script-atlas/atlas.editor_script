@@ -142,6 +142,29 @@ local function add_images_to_new_atlas(opts)
 end
 
 
+local function remove_duplicated_images(opts)
+    local all_images = {}
+    local txs = {}
+    local atlas = editor.get(opts.selection, "path")
+    local image_nodes = editor.get(atlas, "images")
+    for i = 1, #image_nodes do
+        local img = editor.get(image_nodes[i], "image")
+        local _, name, _ = utils.path_segments(img)
+        if all_images[name] then
+            if img == all_images[name] then
+                table.insert(txs, editor.tx.remove(opts.selection, "images", image_nodes[i]))
+            else
+                print("Found two textures that shares name, but has different paths.")
+            end
+        end
+        all_images[name] = img
+    end
+    if #txs > 0 then
+        editor.transact(txs)
+    end
+end
+
+
 function M.get_commands()
     return {
         {
@@ -179,6 +202,15 @@ function M.get_commands()
             },
             active = query.directory_with_images_selected,
             run = create_atlas_from_folder
+        },
+        {
+            label="Remove duplicated images",
+            locations = {"Assets"},
+            query = {
+                selection = {type = "resource", cardinality = "one"}
+            },
+            active = query.atlas_selected,
+            run = remove_duplicated_images
         }
     }
 end

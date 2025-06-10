@@ -4,6 +4,10 @@ local utils = require "editor-script-atlas.utils"
 local M = {}
 
 
+function M.atlas_selected(opts)
+	return utils.ends_with(editor.get(opts.selection, "path"), ".atlas")
+end
+
 function M.images_and_atlas_are_selected(opts)
 	-- Return true if both images and an atlas are selected, however it only allows for 1 atlas.
 	-- if there is multiple we would have to add it to all selected atlases and that sounds,
@@ -44,6 +48,9 @@ end
 
 function M.directory_with_images_selected(opts)
 	-- Return true an directory that contains images are selected.
+	if not editor.resource_attributes(editor.get(opts.selection, "path")).is_directory then
+		return false
+	end
 	local children = editor.get(opts.selection, "children")
 	for i = 1, #children do
 		local resource_path = editor.get(children[i], "path")
@@ -56,6 +63,10 @@ end
 
 function M.directory_contains_image_subdirectories(opts)
 	-- Return true an directory that contains images are selected.
+	if not editor.resource_attributes(editor.get(opts.selection, "path")).is_directory then
+		return false
+	end
+	
 	local children = editor.get(opts.selection, "children")
 	for i = 1, #children do
 		local resource_path = editor.get(children[i], "path")
