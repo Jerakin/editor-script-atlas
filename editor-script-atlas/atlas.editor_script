@@ -11,15 +11,18 @@ local function add_images_as_animation(opts)
         return
     end
     local atlas = utils.get_atlas(opts)
+
+    local images = {}
     for _, id in pairs(opts.selection) do
         local path = editor.get(id, "path")
         if not utils.ends_with(path, ".atlas") then
-            editor.tx.add(atlas, "animations", {
-                id=animation_name,
-                image=path
-            })
+            table.insert(images, {image=path})
         end
     end
+    editor.transact({editor.tx.add(atlas, "animations", {
+        id=animation_name,
+        images=images
+    })})
 end
 
 
